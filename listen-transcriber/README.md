@@ -1,5 +1,8 @@
 # Listen Transcriber (macOS Intel)
 
+![Platform](https://img.shields.io/badge/platform-macOS%20Intel-lightgrey)
+![License](https://img.shields.io/badge/license-MIT-green)
+
 App local para grabar la salida del sistema con BlackHole y transcribir offline con whisper.cpp. Incluye modo **menubar**, wizard de setup y build de **DMG**.
 
 English version: see `README.en.md`.
