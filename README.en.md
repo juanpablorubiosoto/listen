@@ -72,6 +72,10 @@ BlackHole source (GPLv3): https://github.com/ExistentialAudio/BlackHole
 ## Models
 The **Download model** button fetches `ggml-small.bin` or `ggml-medium.bin`.
 
+## Privacy
+All processing is **local/offline**. The app does not send audio or transcripts to any server.
+The only external download is optional: Whisper models.
+
 ## Legal
 - License: **non‑commercial use only**. For commercial use, contact outreach@lsconsulting-co.com.
 - BlackHole is by Existential Audio. If you distribute the `.pkg`, you must comply with GPLv3.
