@@ -11,6 +11,7 @@ BIN_DIR="$ROOT/bin"
 SRC="$ROOT/Sources/App.swift"
 INFO_PLIST="$ROOT/Resources/Info.plist"
 APP_ICON_PNG="$ROOT/Resources/AppIcon.png"
+BLACKHOLE_PKG="$ROOT/Resources/BlackHole2ch.pkg"
 
 mkdir -p "$MACOS_DIR" "$RES_DIR/bin"
 
@@ -45,6 +46,10 @@ if [[ -f "$APP_ICON_PNG" ]]; then
   sips -z 1024 1024 "$APP_ICON_PNG" --out "$ICONSET_DIR/icon_512x512@2x.png" >/dev/null
   iconutil -c icns "$ICONSET_DIR" -o "$ICON_ICNS"
   cp "$ICON_ICNS" "$RES_DIR/AppIcon.icns"
+fi
+
+if [[ -f "$BLACKHOLE_PKG" ]]; then
+  cp "$BLACKHOLE_PKG" "$RES_DIR/BlackHole2ch.pkg"
 fi
 
 if [[ -f "$BIN_DIR/ffmpeg" ]]; then

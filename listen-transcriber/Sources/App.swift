@@ -2,6 +2,7 @@ import SwiftUI
 import AppKit
 import AVFoundation
 import CoreGraphics
+import CoreAudio
 
 struct WindowAccessor: NSViewRepresentable {
     func makeNSView(context: Context) -> NSView {
@@ -72,6 +73,7 @@ final class AppState: ObservableObject {
     @Published var outputFolderPath: String = ""
     @Published var showFolderPicker: Bool = false
     @Published var selectedTab: String = "Principal"
+    @Published var showSetupWizard: Bool = false
 
     func activeDeviceLabel() -> String {
         if let selected = audioDevices.first(where: { $0.id == selectedDeviceId }) {
@@ -351,6 +353,26 @@ final class AppState: ObservableObject {
         NSWorkspace.shared.open(outputFolderURL())
     }
 
+    func isBlackHoleInstalled() -> Bool {
+        FileManager.default.fileExists(atPath: "/Library/Audio/Plug-Ins/HAL/BlackHole2ch.driver")
+    }
+
+    func hasCoreAudioDevice(matching keywords: [String]) -> Bool {
+        let names = coreAudioDeviceNames()
+        return names.contains { name in
+            keywords.contains { name.localizedCaseInsensitiveContains($0) }
+        }
+    }
+
+    func openBundledBlackHoleInstaller() {
+        if let url = Bundle.main.url(forResource: "BlackHole2ch", withExtension: "pkg") {
+            NSWorkspace.shared.open(url)
+            status = "Abriendo instalador de BlackHole..."
+        } else {
+            status = "No encontré BlackHole2ch.pkg dentro de la app."
+        }
+    }
+
     func runProcess(executable: URL, args: [String]) -> String {
         let process = Process()
         process.executableURL = executable
@@ -454,6 +476,67 @@ final class AppState: ObservableObject {
             .joined()
         let collapsed = cleaned.replacingOccurrences(of: "-{2,}", with: "-", options: .regularExpression)
         return collapsed.trimmingCharacters(in: CharacterSet(charactersIn: "-_"))
+    }
+
+    private func coreAudioDeviceNames() -> [String] {
+        var propertyAddress = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDevices,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+
+        var dataSize: UInt32 = 0
+        var status = AudioObjectGetPropertyDataSize(
+            AudioObjectID(kAudioObjectSystemObject),
+            &propertyAddress,
+            0,
+            nil,
+            &dataSize
+        )
+        if status != noErr || dataSize == 0 {
+            return []
+        }
+
+        let deviceCount = Int(dataSize) / MemoryLayout<AudioDeviceID>.size
+        var deviceIDs = Array<AudioDeviceID>(repeating: 0, count: deviceCount)
+        status = AudioObjectGetPropertyData(
+            AudioObjectID(kAudioObjectSystemObject),
+            &propertyAddress,
+            0,
+            nil,
+            &dataSize,
+            &deviceIDs
+        )
+        if status != noErr {
+            return []
+        }
+
+        var names: [String] = []
+        for id in deviceIDs {
+            var name: CFString = "" as CFString
+            var nameSize = UInt32(MemoryLayout<CFString>.size)
+            var nameAddress = AudioObjectPropertyAddress(
+                mSelector: kAudioObjectPropertyName,
+                mScope: kAudioObjectPropertyScopeGlobal,
+                mElement: kAudioObjectPropertyElementMain
+            )
+            let nameStatus = withUnsafeMutablePointer(to: &name) { namePtr in
+                namePtr.withMemoryRebound(to: UInt8.self, capacity: Int(nameSize)) { rawPtr in
+                    AudioObjectGetPropertyData(
+                        id,
+                        &nameAddress,
+                        0,
+                        nil,
+                        &nameSize,
+                        rawPtr
+                    )
+                }
+            }
+            if nameStatus == noErr {
+                names.append(name as String)
+            }
+        }
+        return names
     }
 }
 
@@ -582,6 +665,120 @@ struct MenuPopoverView: View {
                 .font(.caption2)
         }
     }
+}
+
+struct SetupWizardView: View {
+    @EnvironmentObject private var appState: AppState
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Setup Wizard")
+                .font(.system(size: 18, weight: .bold))
+                .foregroundColor(.white)
+
+            GroupBox("1) BlackHole 2ch") {
+                VStack(alignment: .leading, spacing: 6) {
+                    statusLine(appState.isBlackHoleInstalled(), "BlackHole 2ch instalado")
+                    Button("Abrir instalador BlackHole") {
+                        appState.openBundledBlackHoleInstaller()
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.12)))
+                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white.opacity(0.25)))
+                }
+                .padding(.vertical, 6)
+            }
+
+            GroupBox("2) Audio MIDI Setup") {
+                VStack(alignment: .leading, spacing: 6) {
+                    statusLine(appState.hasCoreAudioDevice(matching: ["Multi-Output", "Multi-Output Device"]), "Multi-Output Device creado")
+                    statusLine(appState.hasCoreAudioDevice(matching: ["Aggregate", "Mic & Blackhole", "Mic & BlackHole", "Mic & BlackHole 2ch"]), "Aggregate Device creado (opcional)")
+                    HStack {
+                        Button("Abrir Audio MIDI Setup") {
+                            NSWorkspace.shared.open(URL(fileURLWithPath: "/Applications/Utilities/Audio MIDI Setup.app"))
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.12)))
+                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white.opacity(0.25)))
+
+                        Button("Actualizar verificación") {
+                            appState.listAudioDevices()
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.12)))
+                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white.opacity(0.25)))
+                    }
+                }
+                .padding(.vertical, 6)
+            }
+
+            GroupBox("3) Permisos") {
+                VStack(alignment: .leading, spacing: 6) {
+                    statusLine(appState.micPermissionGranted, "Micrófono permitido")
+                    statusLine(appState.screenPermissionGranted, "Grabación de pantalla permitida")
+                    HStack {
+                        Button("Pedir micrófono") {
+                            appState.requestMicrophonePermission()
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.12)))
+                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white.opacity(0.25)))
+
+                        Button("Pedir pantalla") {
+                            appState.requestScreenRecordingPermission()
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.12)))
+                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white.opacity(0.25)))
+                    }
+                }
+                .padding(.vertical, 6)
+            }
+
+            Divider()
+            HStack {
+                Spacer()
+                Button("Cerrar") { dismiss() }
+                    .buttonStyle(.plain)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.2)))
+                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white.opacity(0.25)))
+            }
+        }
+        .padding(16)
+        .frame(width: 460)
+        .foregroundColor(.white)
+        .tint(.white)
+        .background(.ultraThinMaterial)
+        .environment(\.colorScheme, .dark)
+        .onAppear {
+            appState.refreshPermissions()
+            appState.listAudioDevices()
+        }
+    }
+
+    private func statusLine(_ ok: Bool, _ text: String) -> some View {
+        HStack(spacing: 8) {
+            Circle()
+                .fill(ok ? Color.green : Color.red)
+                .frame(width: 8, height: 8)
+            Text(text)
+                .font(.caption)
+        }
+    }
+
 }
 
 struct ContentView: View {
@@ -766,6 +963,9 @@ struct ContentView: View {
                         Button("Solicitar permiso de grabación de pantalla") {
                             appState.requestScreenRecordingPermission()
                         }
+                        Button("Setup Wizard") {
+                            appState.showSetupWizard = true
+                        }
                     }
                     .padding(.vertical, 4)
                 }
@@ -910,6 +1110,10 @@ struct ContentView: View {
             case .failure(let error):
                 appState.status = "Error al seleccionar carpeta: \(error.localizedDescription)"
             }
+        }
+        .sheet(isPresented: $appState.showSetupWizard) {
+            SetupWizardView()
+                .environmentObject(appState)
         }
     }
 
