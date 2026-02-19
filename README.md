@@ -8,6 +8,7 @@ App local para grabar la salida del sistema con BlackHole y transcribir offline 
 English version: see `README.en.md`.
 
 ## Requisitos
+- macOS Intel.
 - BlackHole 2ch instalado.
 - Xcode Command Line Tools (para compilar whisper.cpp con `make`/`cmake`).
 
