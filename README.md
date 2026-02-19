@@ -72,5 +72,5 @@ Resources/BlackHole2ch.pkg
 El botón **Descargar modelo** baja `ggml-small.bin` o `ggml-medium.bin`.
 
 ## Aviso legal
-- Licencia: uso **no comercial**. Para uso comercial, pide permiso explícito.
+- Licencia: uso **no comercial**. Para uso comercial, escribe a outreach@lsconsulting-co.com.
 - BlackHole es de Existential Audio. Este repo no distribuye su instalador por defecto.
