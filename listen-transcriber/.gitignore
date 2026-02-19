@@ -1,0 +1,20 @@
+# macOS
+.DS_Store
+
+# Builds
+build/
+
+# Local binaries
+bin/
+
+# Bundled installers (local only)
+Resources/BlackHole2ch.pkg
+
+# Whisper models in output dir
+**/Transcripts/
+**/models/
+
+# Xcode/Swift artifacts
+.swiftpm/
+*.xcodeproj
+*.xcworkspace

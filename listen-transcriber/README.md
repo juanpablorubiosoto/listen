@@ -1,38 +1,70 @@
 # Listen Transcriber (macOS Intel)
 
-App local para grabar salida del sistema vía BlackHole y transcribir offline con whisper.cpp.
+App local para grabar la salida del sistema con BlackHole y transcribir offline con whisper.cpp. Incluye modo **menubar**, wizard de setup y build de **DMG**.
 
 ## Requisitos
-- BlackHole 2ch instalado en macOS.
+- macOS Intel.
+- BlackHole 2ch instalado.
 - Xcode Command Line Tools (para compilar whisper.cpp con `make`/`cmake`).
 
-## Pasos
-1) Configura BlackHole
-- En Audio MIDI Setup crea un **Multi-Output Device** con tus speakers + BlackHole 2ch.
-- Selecciona ese dispositivo como salida del sistema o de Zoom/Meet.
+## Setup rápido
+1) Instala BlackHole 2ch.
+2) En **Audio MIDI Setup** crea:
+   - **Multi‑Output Device**: Built‑in Output + BlackHole 2ch.
+   - **Aggregate Device** (opcional): Built‑in Mic + BlackHole 2ch.
+3) Abre la app y otorga permisos de micrófono y grabación de pantalla.
 
-2) Obtener binarios (ffmpeg + whisper-cli)
+## Build
+1) Obtener binarios (ffmpeg + whisper‑cli):
 ```bash
 ./scripts/fetch_binaries.sh
 ```
-El script usa el zip de ffmpeg para macOS Intel desde martin-riedl (listado en ffmpeg.org).
 
-3) Construir app
+2) Construir app:
 ```bash
 ./scripts/build_app.sh
 ```
 
-4) Ejecutar
+3) Ejecutar:
 Abre `build/ListenTranscriber.app`.
 
+## Menubar
+La app crea un icono en la barra superior:
+- Start/Stop
+- Idioma
+- Toggle micrófono
+- Abrir ventana
+
+## Setup Wizard
+En **Settings → Setup Wizard**:
+- Verifica BlackHole 2ch
+- Abre Audio MIDI Setup
+- Verifica permisos
+
+## DMG
+Para generar un DMG:
+```bash
+./scripts/build_dmg.sh
+```
+Incluye la app, `BlackHole2ch.pkg` y un README de instalación.
+
+Para incluir el `.pkg` dentro del DMG, coloca el archivo en:
+```
+Resources/BlackHole2ch.pkg
+```
+
 ## Uso rápido
-- Botón **Detectar BlackHole 2ch** para obtener el índice.
+- **Detectar BlackHole 2ch** para encontrar el índice.
 - **Iniciar grabación** para capturar audio.
 - **Transcribir** para generar el `.txt`.
+- **Elegir audio** para transcribir un WAV existente.
 
 ## Salidas
-- Audio: `~/Downloads/Transcripts/meeting-<timestamp>.wav`
-- Texto: `~/Downloads/Transcripts/meeting-<timestamp>-transcript.txt`
+- Audio: `~/Downloads/Transcripts/<nombre>-<timestamp>.wav`
+- Texto: `~/Downloads/Transcripts/<nombre>-<timestamp>-transcript.txt`
 
 ## Modelos
-El botón **Descargar modelo** baja los modelos oficiales `ggml-small.bin` o `ggml-medium.bin`.
+El botón **Descargar modelo** baja `ggml-small.bin` o `ggml-medium.bin`.
+
+## Aviso legal
+BlackHole es de Existential Audio. Este repo no distribuye su instalador por defecto.
