@@ -55,12 +55,13 @@ Para generar un DMG:
 ```bash
 ./scripts/build_dmg.sh
 ```
-Incluye la app, `BlackHole2ch.pkg` y un README de instalación.
+Incluye la app, `BlackHole2ch.pkg`, licencias y un README de instalación.
 
 Para incluir el `.pkg` dentro del DMG, coloca el archivo en:
 ```
 Resources/BlackHole2ch.pkg
 ```
+Fuente (GPLv3) de BlackHole: https://github.com/ExistentialAudio/BlackHole
 
 ## Uso rápido
 - **Detectar BlackHole 2ch** para encontrar el índice.
@@ -77,4 +78,4 @@ El botón **Descargar modelo** baja `ggml-small.bin` o `ggml-medium.bin`.
 
 ## Aviso legal
 - Licencia: uso **no comercial**. Para uso comercial, escribe a outreach@lsconsulting-co.com.
-- BlackHole es de Existential Audio. Este repo no distribuye su instalador por defecto.
+- BlackHole es de Existential Audio. Si distribuyes el `.pkg`, debes cumplir GPLv3.
