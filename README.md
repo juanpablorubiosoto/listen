@@ -13,7 +13,7 @@ PayPal: https://www.paypal.com/donate/?hosted_button_id=4MGT8CYJ4BJZG
 
 ## Requisitos
 - macOS Intel.
-- BlackHole 2ch instalado.
+- BlackHole 2ch instalado. Descarga oficial: https://existential.audio/blackhole/download/
 - Xcode Command Line Tools (para compilar whisper.cpp con `make`/`cmake`).
 
 ## Setup rápido
