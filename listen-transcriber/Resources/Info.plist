@@ -6,6 +6,8 @@
   <string>ListenTranscriber</string>
   <key>CFBundleIdentifier</key>
   <string>com.listen.transcriber</string>
+  <key>CFBundleIconFile</key>
+  <string>AppIcon</string>
   <key>CFBundleName</key>
   <string>Listen Transcriber</string>
   <key>CFBundlePackageType</key>
