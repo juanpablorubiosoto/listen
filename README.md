@@ -2,10 +2,14 @@
 
 ![Platform](https://img.shields.io/badge/platform-macOS%20Intel-lightgrey)
 ![License](https://img.shields.io/badge/license-Non--Commercial-orange)
+![Donate](https://img.shields.io/badge/Donate-PayPal-blue)
 
 App local para grabar la salida del sistema con BlackHole y transcribir offline con whisper.cpp. Incluye modo **menubar**, wizard de setup y build de **DMG**.
 
 English version: see `README.en.md`.
+
+## Donar
+PayPal: https://www.paypal.com/donate/?hosted_button_id=4MGT8CYJ4BJZG
 
 ## Requisitos
 - macOS Intel.

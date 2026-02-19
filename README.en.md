@@ -1,6 +1,11 @@
 # Listen Transcriber (macOS Intel)
 
+![Donate](https://img.shields.io/badge/Donate-PayPal-blue)
+
 Local app to record system audio with BlackHole and transcribe offline using whisper.cpp. Includes **menubar mode**, a setup wizard, and **DMG** build.
+
+## Donate
+PayPal: https://www.paypal.com/donate/?hosted_button_id=4MGT8CYJ4BJZG
 
 ## Requirements
 - macOS Intel.

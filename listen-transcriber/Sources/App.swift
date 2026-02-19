@@ -373,6 +373,12 @@ final class AppState: ObservableObject {
         }
     }
 
+    func openDonate() {
+        if let url = URL(string: "https://www.paypal.com/donate/?hosted_button_id=4MGT8CYJ4BJZG") {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
     func runProcess(executable: URL, args: [String]) -> String {
         let process = Process()
         process.executableURL = executable
@@ -965,6 +971,9 @@ struct ContentView: View {
                         }
                         Button("Setup Wizard") {
                             appState.showSetupWizard = true
+                        }
+                        Button("Donate") {
+                            appState.openDonate()
                         }
                     }
                     .padding(.vertical, 4)
