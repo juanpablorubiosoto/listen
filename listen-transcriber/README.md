@@ -2,6 +2,8 @@
 
 App local para grabar la salida del sistema con BlackHole y transcribir offline con whisper.cpp. Incluye modo **menubar**, wizard de setup y build de **DMG**.
 
+English version: see `README.en.md`.
+
 ## Requisitos
 - macOS Intel.
 - BlackHole 2ch instalado.
