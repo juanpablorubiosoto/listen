@@ -22,9 +22,17 @@ struct WindowAccessor: NSViewRepresentable {
 enum ModelSize: String, CaseIterable, Identifiable {
     case small = "small"
     case medium = "medium"
+    case largeV3 = "large-v3"
     var id: String { rawValue }
     var filename: String { "ggml-\(rawValue).bin" }
-    var displayName: String { rawValue.capitalized }
+    var displayName: String {
+        switch self {
+        case .largeV3:
+            return "Large"
+        default:
+            return rawValue.capitalized
+        }
+    }
 }
 
 enum Language: String, CaseIterable, Identifiable {
@@ -74,6 +82,7 @@ final class AppState: ObservableObject {
     @Published var showFolderPicker: Bool = false
     @Published var selectedTab: String = "Principal"
     @Published var showSetupWizard: Bool = false
+    @Published var lastMigrationLog: String = ""
 
     func activeDeviceLabel() -> String {
         if let selected = audioDevices.first(where: { $0.id == selectedDeviceId }) {
@@ -115,13 +124,17 @@ final class AppState: ObservableObject {
         UserDefaults.standard.string(forKey: "outputFolderPath") ?? ""
     }
 
+    func defaultOutputFolderURL() -> URL {
+        let home = FileManager.default.homeDirectoryForCurrentUser
+        return home.appendingPathComponent("Downloads/Transcripts")
+    }
+
     func outputFolderURL() -> URL {
         let folder: URL
         if !outputFolderPath.isEmpty {
             folder = URL(fileURLWithPath: outputFolderPath)
         } else {
-            let home = FileManager.default.homeDirectoryForCurrentUser
-            folder = home.appendingPathComponent("Downloads/Transcripts")
+            folder = defaultOutputFolderURL()
         }
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         return folder
@@ -284,8 +297,12 @@ final class AppState: ObservableObject {
             status = "Modelo no encontrado. Usa 'Descargar modelo'."
             return
         }
-        let baseNamePath = URL(fileURLWithPath: lastAudioPath).deletingPathExtension().path
-        let outputBase = baseNamePath + "-transcript"
+        let baseName = URL(fileURLWithPath: lastAudioPath)
+            .deletingPathExtension()
+            .lastPathComponent
+        let outputBase = outputFolderURL()
+            .appendingPathComponent("\(baseName)-transcript")
+            .path
         lastTranscriptPath = outputBase + ".txt"
 
         var args = [
@@ -308,7 +325,7 @@ final class AppState: ObservableObject {
             DispatchQueue.main.async {
                 self.isTranscribing = false
                 self.lastWhisperLog = output.isEmpty ? "Sin salida de whisper." : output
-                self.status = "Transcripción lista."
+                self.status = "Transcripción lista: \(self.lastTranscriptPath)"
             }
         }
     }
@@ -351,6 +368,45 @@ final class AppState: ObservableObject {
 
     func openOutputFolder() {
         NSWorkspace.shared.open(outputFolderURL())
+    }
+
+    func migrateDefaultTranscriptsIfNeeded(previousPath: String, newFolderURL: URL) -> (status: String, log: String)? {
+        guard previousPath.isEmpty else { return nil }
+        let defaultURL = defaultOutputFolderURL()
+        guard defaultURL.path != newFolderURL.path else { return nil }
+        guard FileManager.default.fileExists(atPath: defaultURL.path) else { return nil }
+
+        do {
+            try FileManager.default.createDirectory(at: newFolderURL, withIntermediateDirectories: true)
+            let items = try FileManager.default.contentsOfDirectory(at: defaultURL, includingPropertiesForKeys: nil)
+            var movedCount = 0
+            var skippedCount = 0
+            var skippedNames: [String] = []
+            for item in items {
+                let destination = newFolderURL.appendingPathComponent(item.lastPathComponent)
+                if !FileManager.default.fileExists(atPath: destination.path) {
+                    try FileManager.default.moveItem(at: item, to: destination)
+                    movedCount += 1
+                } else {
+                    skippedCount += 1
+                    skippedNames.append(item.lastPathComponent)
+                }
+            }
+            let remaining = try FileManager.default.contentsOfDirectory(at: defaultURL, includingPropertiesForKeys: nil)
+            if remaining.isEmpty {
+                try? FileManager.default.removeItem(at: defaultURL)
+            }
+            if movedCount == 0 && skippedCount == 0 {
+                return ("No encontré archivos para mover desde Downloads.", "")
+            }
+            if skippedCount == 0 {
+                return ("Moví \(movedCount) archivo(s) desde Downloads.", "")
+            }
+            let log = skippedNames.isEmpty ? "" : "Omitidos por conflicto: " + skippedNames.joined(separator: ", ")
+            return ("Moví \(movedCount) archivo(s); omití \(skippedCount) por conflicto.", log)
+        } catch {
+            return ("No pude mover Transcripts desde Downloads: \(error.localizedDescription)", "")
+        }
     }
 
     func isBlackHoleInstalled() -> Bool {
@@ -1028,11 +1084,20 @@ struct ContentView: View {
                 }
 
                 GroupBox("Estado") {
-                    Text(appState.status)
-                        .font(.caption)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .padding(.vertical, 2)
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(appState.status)
+                            .font(.caption)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .fixedSize(horizontal: false, vertical: true)
+                        if !appState.lastMigrationLog.isEmpty {
+                            Text(appState.lastMigrationLog)
+                                .font(.caption2)
+                                .foregroundColor(.white.opacity(0.8))
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                    .padding(.vertical, 2)
                 }
 
                         Spacer()
@@ -1112,9 +1177,12 @@ struct ContentView: View {
             switch result {
             case .success(let urls):
                 if let url = urls.first {
+                    let previousPath = appState.outputFolderPath
                     appState.outputFolderPath = url.path
                     appState.saveOutputFolderPath(appState.outputFolderPath)
-                    appState.status = "Carpeta de salida actualizada."
+                    let migrationResult = appState.migrateDefaultTranscriptsIfNeeded(previousPath: previousPath, newFolderURL: url)
+                    appState.status = migrationResult?.status ?? "Carpeta de salida actualizada."
+                    appState.lastMigrationLog = migrationResult?.log ?? ""
                 }
             case .failure(let error):
                 appState.status = "Error al seleccionar carpeta: \(error.localizedDescription)"
