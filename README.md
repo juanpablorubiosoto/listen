@@ -1,14 +1,13 @@
 # Listen Transcriber (macOS Intel)
 
 ![Platform](https://img.shields.io/badge/platform-macOS%20Intel-lightgrey)
-![License](https://img.shields.io/badge/license-MIT-green)
+![License](https://img.shields.io/badge/license-Non--Commercial-orange)
 
 App local para grabar la salida del sistema con BlackHole y transcribir offline con whisper.cpp. Incluye modo **menubar**, wizard de setup y build de **DMG**.
 
 English version: see `README.en.md`.
 
 ## Requisitos
-- macOS Intel.
 - BlackHole 2ch instalado.
 - Xcode Command Line Tools (para compilar whisper.cpp con `make`/`cmake`).
 
@@ -72,4 +71,5 @@ Resources/BlackHole2ch.pkg
 El botón **Descargar modelo** baja `ggml-small.bin` o `ggml-medium.bin`.
 
 ## Aviso legal
-BlackHole es de Existential Audio. Este repo no distribuye su instalador por defecto.
+- Licencia: uso **no comercial**. Para uso comercial, pide permiso explícito.
+- BlackHole es de Existential Audio. Este repo no distribuye su instalador por defecto.
