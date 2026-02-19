@@ -6,6 +6,7 @@ Local app to record system audio with BlackHole and transcribe offline using whi
 - macOS Intel.
 - BlackHole 2ch installed.
 - Xcode Command Line Tools (to build whisper.cpp with `make`/`cmake`).
+
 ## Quick Setup
 1) Install BlackHole 2ch.
 2) In **Audio MIDI Setup**, create:
