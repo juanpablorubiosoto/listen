@@ -32,10 +32,10 @@ if [[ -d "$LICENSES_DIR" ]]; then
   cp -R "$LICENSES_DIR" "$STAGING/"
 fi
 if [[ -f "$THIRD_PARTY" ]]; then
-  cp "$THIRD_PARTY" "$STAGING/THIRD_PARTY_NOTICES.md"
+  cp "$THIRD_PARTY" "$STAGING/THIRD_PARTY_NOTICES.txt"
 fi
 if [[ -f "$NOTICE_FILE" ]]; then
-  cp "$NOTICE_FILE" "$STAGING/NOTICE"
+  cp "$NOTICE_FILE" "$STAGING/NOTICE.txt"
 fi
 
 cat > "$STAGING/README.txt" <<'EOF'
