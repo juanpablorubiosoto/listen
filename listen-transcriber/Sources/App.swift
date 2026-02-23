@@ -83,6 +83,10 @@ final class AppState: ObservableObject {
     @Published var selectedTab: String = "Principal"
     @Published var showSetupWizard: Bool = false
     @Published var lastMigrationLog: String = ""
+    @Published var transcriptionProgress: Double = 0
+    @Published var transcriptionPreview: String = ""
+    @Published var transcriptionHasDuration: Bool = false
+    @Published var transcriptionDurationSeconds: Double = 0
 
     func activeDeviceLabel() -> String {
         if let selected = audioDevices.first(where: { $0.id == selectedDeviceId }) {
@@ -320,11 +324,67 @@ final class AppState: ObservableObject {
 
         isTranscribing = true
         status = "Transcribiendo..."
+        transcriptionProgress = 0
+        transcriptionPreview = ""
+        transcriptionDurationSeconds = 0
+        transcriptionHasDuration = false
+        loadAudioDurationSeconds(url: URL(fileURLWithPath: lastAudioPath))
+
         DispatchQueue.global(qos: .userInitiated).async {
-            let output = self.runProcess(executable: whisper, args: args)
+            let process = Process()
+            process.executableURL = whisper
+            process.arguments = args
+
+            let pipe = Pipe()
+            process.standardOutput = pipe
+            process.standardError = pipe
+
+            var logLines: [String] = []
+            var buffer = Data()
+
+            pipe.fileHandleForReading.readabilityHandler = { handle in
+                let data = handle.availableData
+                if data.isEmpty {
+                    return
+                }
+                buffer.append(data)
+                while let range = buffer.range(of: Data([0x0A])) {
+                    let lineData = buffer.subdata(in: 0..<range.lowerBound)
+                    buffer.removeSubrange(0...range.lowerBound)
+                    guard let line = String(data: lineData, encoding: .utf8) else { continue }
+                    logLines.append(line)
+                    if logLines.count > 200 {
+                        logLines.removeFirst(logLines.count - 200)
+                    }
+                    self.updateTranscriptionProgress(from: line)
+                }
+            }
+
+            do {
+                try process.run()
+            } catch {
+                DispatchQueue.main.async {
+                    self.isTranscribing = false
+                    self.status = "Error al iniciar transcripción: \(error.localizedDescription)"
+                }
+                return
+            }
+
+            process.waitUntilExit()
+            pipe.fileHandleForReading.readabilityHandler = nil
+
+            let remaining = pipe.fileHandleForReading.readDataToEndOfFile()
+            if !remaining.isEmpty, let tail = String(data: remaining, encoding: .utf8) {
+                logLines.append(tail)
+            }
+
             DispatchQueue.main.async {
                 self.isTranscribing = false
-                self.lastWhisperLog = output.isEmpty ? "Sin salida de whisper." : output
+                let joined = logLines.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+                self.lastWhisperLog = joined.isEmpty ? "Sin salida de whisper." : joined
+                if self.transcriptionHasDuration {
+                    self.transcriptionProgress = 1
+                }
                 self.status = "Transcripción lista: \(self.lastTranscriptPath)"
             }
         }
@@ -453,6 +513,92 @@ final class AppState: ObservableObject {
         let data = pipe.fileHandleForReading.readDataToEndOfFile()
         process.waitUntilExit()
         return String(data: data, encoding: .utf8) ?? ""
+    }
+
+    func loadAudioDurationSeconds(url: URL) {
+        let asset = AVURLAsset(url: url)
+        if #available(macOS 13.0, *) {
+            Task {
+                do {
+                    let duration = try await asset.load(.duration)
+                    let seconds = CMTimeGetSeconds(duration)
+                    DispatchQueue.main.async {
+                        let value = seconds.isFinite && seconds > 0 ? seconds : 0
+                        self.transcriptionDurationSeconds = value
+                        self.transcriptionHasDuration = value > 0
+                    }
+                } catch {
+                    DispatchQueue.main.async {
+                        self.transcriptionDurationSeconds = 0
+                        self.transcriptionHasDuration = false
+                    }
+                }
+            }
+        } else {
+            asset.loadValuesAsynchronously(forKeys: ["duration"]) {
+                var error: NSError?
+                let status = asset.statusOfValue(forKey: "duration", error: &error)
+                let seconds: Double
+                if status == .loaded {
+                    seconds = CMTimeGetSeconds(asset.duration)
+                } else {
+                    seconds = 0
+                }
+                DispatchQueue.main.async {
+                    let value = seconds.isFinite && seconds > 0 ? seconds : 0
+                    self.transcriptionDurationSeconds = value
+                    self.transcriptionHasDuration = value > 0
+                }
+            }
+        }
+    }
+
+    func updateTranscriptionProgress(from line: String) {
+        let pattern = "\\[(\\d{2}:\\d{2}:\\d{2}\\.\\d{3}) --> (\\d{2}:\\d{2}:\\d{2}\\.\\d{3})\\] (.*)"
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return }
+        let range = NSRange(line.startIndex..<line.endIndex, in: line)
+        guard let match = regex.firstMatch(in: line, options: [], range: range) else { return }
+
+        let endRange = match.range(at: 2)
+        let textRange = match.range(at: 3)
+        guard let end = Range(endRange, in: line),
+              let text = Range(textRange, in: line) else {
+            return
+        }
+
+        let endString = String(line[end])
+        let snippet = String(line[text]).trimmingCharacters(in: .whitespaces)
+
+        DispatchQueue.main.async {
+            if !snippet.isEmpty {
+                if self.transcriptionPreview.isEmpty {
+                    self.transcriptionPreview = snippet
+                } else {
+                    self.transcriptionPreview += "\n" + snippet
+                }
+                if self.transcriptionPreview.count > 1200 {
+                    self.transcriptionPreview = String(self.transcriptionPreview.suffix(1200))
+                }
+            }
+
+            if self.transcriptionDurationSeconds > 0 {
+                let endSeconds = self.timecodeToSeconds(endString)
+                if endSeconds > 0 {
+                    self.transcriptionProgress = min(1, max(self.transcriptionProgress, endSeconds / self.transcriptionDurationSeconds))
+                }
+            }
+        }
+    }
+
+    func timecodeToSeconds(_ timecode: String) -> Double {
+        let parts = timecode.split(separator: ":")
+        guard parts.count == 3 else { return 0 }
+        let hours = Double(parts[0]) ?? 0
+        let minutes = Double(parts[1]) ?? 0
+        let secondsParts = parts[2].split(separator: ".")
+        let seconds = Double(secondsParts.first ?? "0") ?? 0
+        let milliseconds = Double(secondsParts.count > 1 ? secondsParts[1] : "0") ?? 0
+        return hours * 3600 + minutes * 60 + seconds + milliseconds / 1000.0
     }
 
     func parseBlackHoleIndex(output: String) -> Int? {
@@ -954,6 +1100,23 @@ struct ContentView: View {
                     if !appState.downloadStatus.isEmpty {
                         Text(appState.downloadStatus)
                             .font(.caption)
+                        }
+                        if appState.isTranscribing {
+                            if appState.transcriptionHasDuration {
+                                ProgressView(value: appState.transcriptionProgress)
+                                    .frame(maxWidth: 260)
+                                Text("\(Int(appState.transcriptionProgress * 100))%")
+                                    .font(.caption2)
+                            } else {
+                                ProgressView()
+                                    .frame(maxWidth: 260)
+                            }
+                        }
+                        if !appState.transcriptionPreview.isEmpty {
+                            Text(appState.transcriptionPreview)
+                                .font(.caption2)
+                                .lineLimit(6)
+                                .frame(maxWidth: .infinity, alignment: .leading)
                         }
                         if !appState.lastTranscriptPath.isEmpty {
                             Text("Texto: \(appState.lastTranscriptPath)")
